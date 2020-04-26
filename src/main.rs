@@ -2,9 +2,9 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 use clap::{crate_version, App, AppSettings, Arg};
 use failure::{format_err, Error};
 use jtd::{form, Form, Schema, SerdeSchema};
-use rand::rngs::SmallRng;
 use rand::seq::IteratorRandom;
 use rand::SeedableRng;
+use rand_pcg::Pcg32;
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
@@ -50,8 +50,8 @@ fn main() -> Result<(), Error> {
         .map_err(|err| format_err!("{:?}", err))?;
 
     let mut rng = match matches.value_of("s").unwrap().parse::<u64>()? {
-        0 => SmallRng::from_entropy(),
-        n @ _ => SmallRng::seed_from_u64(n),
+        0 => Pcg32::from_entropy(),
+        n @ _ => Pcg32::seed_from_u64(n),
     };
 
     let mut i = 0;
