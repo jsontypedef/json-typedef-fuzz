@@ -2,7 +2,9 @@ use chrono::{DateTime, NaiveDateTime, Utc};
 use clap::{crate_version, App, AppSettings, Arg};
 use failure::{format_err, Error};
 use jtd::{form, Form, Schema, SerdeSchema};
+use rand::rngs::SmallRng;
 use rand::seq::IteratorRandom;
+use rand::SeedableRng;
 use serde_json::Value;
 use std::collections::{HashMap, HashSet};
 use std::convert::TryInto;
@@ -20,6 +22,13 @@ fn main() -> Result<(), Error> {
                 .default_value("0")
                 .short("n")
                 .long("num-values"),
+        )
+        .arg(
+            Arg::with_name("s")
+                .help("A seed for the random number generator used internally. Zero (0) disables seeding, and uses an entropy source instead")
+                .default_value("0")
+                .short("s")
+                .long("seed"),
         )
         .arg(
             Arg::with_name("INPUT")
@@ -40,7 +49,11 @@ fn main() -> Result<(), Error> {
         .try_into()
         .map_err(|err| format_err!("{:?}", err))?;
 
-    let mut rng = rand::thread_rng();
+    let mut rng = match matches.value_of("s").unwrap().parse::<u64>()? {
+        0 => SmallRng::from_entropy(),
+        n @ _ => SmallRng::seed_from_u64(n),
+    };
+
     let mut i = 0;
     while i != num_values || num_values == 0 {
         println!("{}", fuzz(&schema, &mut rng, &schema));
