@@ -141,7 +141,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b8b7a7c0c47db5545ed3fef7468ee7bb5b74691498139e4b3f6a20685dc6dd8e"
 
 [[package]]
-name = "json-typedef-fuzz"
+name = "jtd"
+version = "0.1.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3da2c72fdc110e4efa643b01d7c181a5ff3f7e45e4d112d0e3b732bdd57026ce"
+dependencies = [
+ "chrono",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "jtd-fuzz"
 version = "0.1.0"
 dependencies = [
  "chrono",
@@ -150,17 +161,6 @@ dependencies = [
  "jtd",
  "rand",
  "rand_pcg",
- "serde_json",
-]
-
-[[package]]
-name = "jtd"
-version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3da2c72fdc110e4efa643b01d7c181a5ff3f7e45e4d112d0e3b732bdd57026ce"
-dependencies = [
- "chrono",
- "serde",
  "serde_json",
 ]
 
