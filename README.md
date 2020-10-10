@@ -1,6 +1,7 @@
 # jtd-fuzz
 
-`jtd-fuzz` generates example data from a JSON Typedef schema.
+`jtd-fuzz` generates example data [(aka "fuzz tests")][fuzz] from a JSON Typedef
+schema.
 
 ```bash
 echo '{ "elements": { "type": "string" }}' | jtd-fuzz -n 5
@@ -22,22 +23,42 @@ randomness needs to be cryptographically secure.
 
 To install `jtd-fuzz`, you have a few options:
 
-### Install with Homebrew
+### Install on macOS
 
-This option is recommended if you're on macOS.
+You can install `jtd-fuzz` via Homebrew:
 
 ```bash
 brew install jsontypedef/jsontypedef/jtd-fuzz
 ```
 
-### Install with Docker
-
-This option is recommended on non-Mac platforms, or if you're running `jtd-fuzz`
-in some sort of script and you want to make sure that everyone running the
-script uses the same version of `jtd-fuzz`.
+Alternatively, you can download and extract the binary yourself from
+`x86_64-apple-darwin.zip` in [the latest release][latest]. Because of Apple's
+quarantine system, you will either need to run:
 
 ```bash
-docker pull jsontypedef/jtd-tools
+xattr -d com.apple.quarantine path/to/jtd-fuzz
+```
+
+In order to be able to run the executable.
+
+### Install on Linux
+
+Download and extract the binary from `x86_64-unknown-linux-gnu.zip` in [the
+latest release][latest].
+
+### Install on Windows
+
+Download and extract the binary from `x86_64-pc-windows-gnu.zip` in [the latest
+release][latest]. Runs on 64-bit MinGW for Windows 7+.
+
+### Install with Docker
+
+This option is recommended if you're running `jtd-fuzz` in some sort of script
+and you want to make sure that everyone running the script uses the same version
+of `jtd-fuzz`.
+
+```bash
+docker pull jsontypedef/jtd-fuzz
 ```
 
 If you opt to use the Docker approach, you will need to change all invocations
@@ -50,19 +71,18 @@ jtd-fuzz [...]
 To:
 
 ```bash
-docker exec -it jsontypedef/jtd-tools /jtd-fuzz [...]
-```
+# To have jtd-fuzz read from STDIN, run it like so:
+docker exec -i jsontypedef/jtd-fuzz [...]
 
-### Install with Cargo
-
-This option is recommended if you already have `cargo` installed, or if you
-would prefer to use a version of `jtd-fuzz` compiled on your machine:
-
-```bash
-cargo install jtd-fuzz
+# To have jtd-fuzz read from a file, run it as:
+docker run -v /path/to/file.json:/file.json -i jsontypedef/jtd-fuzz [...] file.json
+# or, if file.json is in your current directory:
+docker run -v $(pwd)/file.json:/file.json -i jsontypedef/jtd-fuzz [...] file.json
 ```
 
 ## Usage
+
+### Basic Usage
 
 To invoke `jtd-fuzz`, you can either:
 
@@ -84,7 +104,15 @@ If you'd like to have `jtd-fuzz` output an exact number of results, use `-n`:
 echo '{}' | jtd-fuzz -n 5
 ```
 
-## Advanced Usage: Providing a Seed
+Or, to have `jtd-fuzz` read from a file:
+
+```bash
+echo '{ "type": "timestamp" }' > foo.jtd.json
+
+jtd-fuzz -n 5 foo.jtd.json
+```
+
+### Advanced Usage: Providing a Seed
 
 By default, `jtd-fuzz` will generate different output every time:
 
@@ -103,23 +131,26 @@ pseudo-random number generator. For the same seed and schema, `jtd-fuzz` will
 output the same data every time:
 
 ```bash
-echo '{}' | cargo run -- -n 1 -s 1815 ; echo '{}' | cargo run -- -n 1 -s 1815
+echo '{}' | jtd-fuzz -n 1 -s 8927 ; echo '{}' | jtd-fuzz -n 1 -s 8927
 ```
 
 ```json
-{"":null,"8= Rk":0.4883371274545145,";":0.6198663347278088,"Zg":[["O^;BZ",92,null,["9]0MZ_q",null,{}]],null,0.7705810550086981,"xb",false,"i","h"],"m83":115}
-{"":null,"8= Rk":0.4883371274545145,";":0.6198663347278088,"Zg":[["O^;BZ",92,null,["9]0MZ_q",null,{}]],null,0.7705810550086981,"xb",false,"i","h"],"m83":115}
+48
+48
 ```
 
 The `-s` option takes an integer between 0 and 2^64 - 1.
 
-The `-s` option can be useful if you're using `jtd-fuzz` to do automated testing
-against a system. Your automated testing system can pass `jtd-fuzz` a
-randomly-generated seed, and if the automated tester finds a seed that generates
-problematic output, it can output the seed it used. That way, developers can
-re-use that seed, and try to reproduce the issue locally.
+Seeding `jtd-fuzz` can be useful if you're using `jtd-fuzz` to do automated
+testing against a system. Your automated testing system can pass `jtd-fuzz` a
+randomly-generated seed, and if the automated tester finds a seed that reveals a
+bug, it can output the seed it used. That way, developers can re-use that seed,
+and try to reproduce the issue locally.
 
 Note that `jtd-fuzz` is only guaranteed to produce consistent output if you use
 the same seed, schema, and version of `jtd-fuzz`. Different versions on
 `jtd-fuzz` may output different results, even if you give them the same seed and
 schema.
+
+[fuzz]: https://en.wikipedia.org/wiki/Fuzzing
+[latest]: https://github.com/jsontypedef/json-typedef-fuzz/releases/latest
