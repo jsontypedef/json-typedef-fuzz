@@ -54,6 +54,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create_release.outputs.upload_url }}
-          asset_path: target/${{ matrix.target }}/release/${{ matrix.artifact }}
+          asset_path: ${{ matrix.target }}.zip
           asset_name: ${{ matrix.target }}.zip
           asset_content_type: application/zip
