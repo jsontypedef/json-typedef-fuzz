@@ -1,7 +1,7 @@
 on:
   push:
-    branches:
-      - master
+    tags:
+      - *
 
 jobs:
   # Create the GitHub release to publish artifacts to.
@@ -10,14 +10,13 @@ jobs:
     outputs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
     steps:
-      - id: get_release_version
-        run: echo ::set-output name=version::$(cargo pkgid | cut -d '#' -f 2)
       - id: create_release
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          release_name: ${{ steps.get_release_version.outputs.version }}
+          tag_name: ${{ github.ref }}
+          release_name: ${{ github.ref }}
 
   release_binary:
     runs-on: ${{ matrix.runs_on }}
