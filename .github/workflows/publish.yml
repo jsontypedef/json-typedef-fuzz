@@ -1,10 +1,9 @@
 on:
   push:
     tags:
-      - *
+      - v*
 
 jobs:
-  # Create the GitHub release to publish artifacts to.
   create_release:
     runs-on: ubuntu-latest
     outputs:
