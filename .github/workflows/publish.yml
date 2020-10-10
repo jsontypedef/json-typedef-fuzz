@@ -1,9 +1,11 @@
 on:
   push:
-    branches:
-      - master
+    tags:
+      - '[0-9]+.[0-9]+.[0-9]+'
+
 jobs:
-  publish:
+  # Publish jtd_fuzz, the Rust crate.
+  publish_crate:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2
@@ -13,3 +15,56 @@ jobs:
       - run: cargo publish
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+  # All steps that follow are for publishing jtd-fuzz, a binary executable.
+
+  # Create the GitHub release to publish artifacts to.
+  create_release:
+    runs-on: ubuntu-latest
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
+    steps:
+      - id: create_release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: ${{ github.ref }}
+          draft: false
+          prerelease: false
+
+  release_binary:
+    runs-on: ubuntu-latest
+    needs: create_release
+    strategy:
+      matrix:
+        target:
+          - i686-pc-windows-gnu
+          - i686-pc-windows-msvc
+          - i686-unknown-linux-gnu
+          - x86_64-apple-darwin
+          - x86_64-pc-windows-gnu
+          - x86_64-pc-windows-msvc
+          - x86_64-unknown-linux-gnu
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+      - run: cd jtd_fuzz_bin
+      - run: rustup target add $TARGET
+        env:
+          TARGET: ${{ matrix.target }}
+      - run: cargo build --release --target=$TARGET
+        env:
+          TARGET: ${{ matrix.target }}
+      - run: zip --junk-paths $TARGET.zip target/$TARGET/release/jtd-fuzz
+      - uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          asset_path: ./build.zip
+          asset_name: fakegit_darwin_amd64.zip
+          asset_content_type: application/zip
