@@ -1,7 +1,7 @@
 [package]
 name = "jtd-fuzz"
 description = "Generates example data from JSON Typedef schemas"
-version = "0.1.9"
+version = "0.1.10"
 license = "MIT"
 authors = ["JSON Typedef Contributors"]
 edition = "2018"
