@@ -60,11 +60,13 @@ jobs:
         env:
           TARGET: ${{ matrix.target }}
       - run: zip --junk-paths $TARGET.zip target/$TARGET/release/jtd-fuzz
+        env:
+          TARGET: ${{ matrix.target }}
       - uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create_release.outputs.upload_url }}
-          asset_path: ./build.zip
-          asset_name: fakegit_darwin_amd64.zip
+          asset_path: ./{{ matrix.target }}.zip
+          asset_name: {{ matrix.target }}.zip
           asset_content_type: application/zip
