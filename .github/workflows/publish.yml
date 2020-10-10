@@ -59,7 +59,8 @@ jobs:
       - run: cargo build --release --target=$TARGET
         env:
           TARGET: ${{ matrix.target }}
-      - run: zip --junk-paths $TARGET.zip target/$TARGET/release/jtd-fuzz
+        working-directory: jtd_fuzz_bin
+      - run: zip --junk-paths $TARGET.zip jtd_fuzz_bin/target/$TARGET/release/jtd-fuzz
         env:
           TARGET: ${{ matrix.target }}
       - uses: actions/upload-release-asset@v1
@@ -67,6 +68,6 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create_release.outputs.upload_url }}
-          asset_path: ./${{ matrix.target }}.zip
+          asset_path: jtd_fuzz_bin/${{ matrix.target }}.zip
           asset_name: ${{ matrix.target }}.zip
           asset_content_type: application/zip
