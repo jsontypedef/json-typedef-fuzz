@@ -6,7 +6,7 @@ edition = "2018"
 
 [dependencies]
 anyhow = "^1"
-jtd_fuzz = { path = "../" }
+jtd_fuzz = { version = "0.1.8", path = "../jtd_fuzz" }
 clap = "^2"
 serde_json = "^1"
 jtd = "^0.1.4"
