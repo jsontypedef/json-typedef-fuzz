@@ -1,73 +1,61 @@
 on:
   push:
-    tags:
-      - 'v[0-9]+.[0-9]+.[0-9]+'
+    branches:
+      - master
 
 jobs:
-  # Publish jtd_fuzz, the Rust crate.
-  publish_crate:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-      - run: cargo publish
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-
-  # All steps that follow are for publishing jtd-fuzz, a binary executable.
-
   # Create the GitHub release to publish artifacts to.
   create_release:
     runs-on: ubuntu-latest
     outputs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
     steps:
+      - id: get_release_version
+        run: echo ::set-output name=version::$(cargo pkgid | cut -d '#' -f 2)
       - id: create_release
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          tag_name: ${{ github.ref }}
-          release_name: ${{ github.ref }}
-          draft: false
-          prerelease: false
+          release_name: ${{ steps.get_release_version.outputs.version }}
 
   release_binary:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runs_on }}
     needs: create_release
     strategy:
       matrix:
         target:
-          - i686-pc-windows-gnu
-          - i686-pc-windows-msvc
-          - i686-unknown-linux-gnu
+          - x86_64-unknown-linux-gnu
           - x86_64-apple-darwin
           - x86_64-pc-windows-gnu
-          - x86_64-pc-windows-msvc
-          - x86_64-unknown-linux-gnu
+        include:
+          - target: x86_64-unknown-linux-gnu
+            runs_on: ubuntu-latest
+            artifact: jtd-fuzz
+          - target: x86_64-apple-darwin
+            runs_on: macos-latest
+            artifact: jtd-fuzz
+          - target: x86_64-pc-windows-gnu
+            runs_on: ubuntu-latest
+            artifact: jtd-fuzz.exe
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
-      - run: cd jtd_fuzz_bin
-      - run: rustup target add $TARGET
+      - run: cargo install cross
+      - run: cross build --release --target=$TARGET
         env:
           TARGET: ${{ matrix.target }}
-      - run: cargo build --release --target=$TARGET
+      - run: zip --junk-paths $TARGET.zip target/$TARGET/release/$ARTIFACT
         env:
           TARGET: ${{ matrix.target }}
-        working-directory: jtd_fuzz_bin
-      - run: zip --junk-paths $TARGET.zip jtd_fuzz_bin/target/$TARGET/release/jtd-fuzz
-        env:
-          TARGET: ${{ matrix.target }}
+          ARTIFACT: ${{ matrix.artifact }}
       - uses: actions/upload-release-asset@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           upload_url: ${{ needs.create_release.outputs.upload_url }}
-          asset_path: jtd_fuzz_bin/${{ matrix.target }}.zip
+          asset_path: target/${{ matrix.target }}/release/${{ matrix.artifact }}
           asset_name: ${{ matrix.target }}.zip
           asset_content_type: application/zip
