@@ -172,7 +172,7 @@ fn fuzz_with_root<R: rand::Rng>(root: &jtd::Schema, rng: &mut R, schema: &jtd::S
                     // Although timestamp_millis accepts an i64, not all values
                     // in that range are permissible. The i32 range is entirely
                     // safe.
-                    chrono::FixedOffset::east(rng.gen_range(-86_400, 86_400))
+                    chrono::FixedOffset::east(rng.gen_range(-86_400 + 1, 86_400 - 1))
                         .timestamp(rng.gen::<i32>() as i64, 0)
                         .to_rfc3339()
                         .into()
