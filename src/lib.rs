@@ -57,9 +57,9 @@ const MAX_SEQ_LENGTH: u8 = 8;
 /// let mut rng = rand_pcg::Pcg32::seed_from_u64(8927);
 ///
 /// assert_eq!(jtd_fuzz::fuzz(&schema, &mut rng), json!({
-///     "name": "=T$m;[5",
-///     "createdAt": "2012-03-15T02:51:27+10:31",
-///     "favoriteNumbers": [142, 236, 67]
+///     "name": "e",
+///     "createdAt": "1931-10-18T14:26:10-05:14",
+///     "favoriteNumbers": [166, 142]
 /// }));
 /// ```
 pub fn fuzz<R: rand::Rng>(schema: &jtd::Schema, rng: &mut R) -> Value {
