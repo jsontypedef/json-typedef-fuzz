@@ -57,9 +57,9 @@ const MAX_SEQ_LENGTH: u8 = 8;
 /// let mut rng = rand_pcg::Pcg32::seed_from_u64(8927);
 ///
 /// assert_eq!(jtd_fuzz::fuzz(&schema, &mut rng), json!({
-///     "name": "=T$m;[5",
-///     "createdAt": "2012-03-15T02:51:27+10:31",
-///     "favoriteNumbers": [142, 236, 67]
+///     "name": "e",
+///     "createdAt": "1931-10-18T14:26:10-05:14",
+///     "favoriteNumbers": [166, 142]
 /// }));
 /// ```
 pub fn fuzz<R: rand::Rng>(schema: &jtd::Schema, rng: &mut R) -> Value {
@@ -172,7 +172,7 @@ fn fuzz_with_root<R: rand::Rng>(root: &jtd::Schema, rng: &mut R, schema: &jtd::S
                     // Although timestamp_millis accepts an i64, not all values
                     // in that range are permissible. The i32 range is entirely
                     // safe.
-                    chrono::FixedOffset::east(rng.gen_range(-86_400, 86_400))
+                    chrono::FixedOffset::east(rng.gen_range(-86_400 + 1, 86_400 - 1))
                         .timestamp(rng.gen::<i32>() as i64, 0)
                         .to_rfc3339()
                         .into()
