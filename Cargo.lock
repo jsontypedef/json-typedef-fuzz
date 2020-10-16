@@ -98,9 +98,9 @@ checksum = "b8b7a7c0c47db5545ed3fef7468ee7bb5b74691498139e4b3f6a20685dc6dd8e"
 
 [[package]]
 name = "jtd"
-version = "0.1.4"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3da2c72fdc110e4efa643b01d7c181a5ff3f7e45e4d112d0e3b732bdd57026ce"
+checksum = "54f0964332e071f2832a3ecd241ec19dcc5ae55992bc573c04b40e69ab95bc52"
 dependencies = [
  "chrono",
  "serde",
