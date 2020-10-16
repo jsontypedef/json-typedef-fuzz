@@ -1,13 +1,13 @@
 [package]
 name = "jtd-fuzz"
 description = "Generates example data from JSON Typedef schemas"
-version = "0.1.12"
+version = "0.1.13"
 license = "MIT"
 authors = ["JSON Typedef Contributors"]
 edition = "2018"
 
 [dependencies]
-jtd = "^0.1.4"
+jtd = "^0.2"
 serde_json = "^1"
 rand = "^0.7"
 chrono = "^0.4"

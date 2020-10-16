@@ -2,7 +2,7 @@
 
 use rand::seq::IteratorRandom;
 use serde_json::Value;
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 // Max length when generating "sequences" of things, such as strings, arrays,
 // and objects.
@@ -100,8 +100,8 @@ fn fuzz_with_root<R: rand::Rng>(root: &jtd::Schema, rng: &mut R, schema: &jtd::S
                 // why it's important these come after the "primitive" cases.
                 5 => {
                     let schema = jtd::Schema {
-                        metadata: HashMap::new(),
-                        definitions: HashMap::new(),
+                        metadata: BTreeMap::new(),
+                        definitions: BTreeMap::new(),
                         form: jtd::Form::Elements(jtd::form::Elements {
                             nullable: false,
                             schema: Default::default(),
@@ -113,8 +113,8 @@ fn fuzz_with_root<R: rand::Rng>(root: &jtd::Schema, rng: &mut R, schema: &jtd::S
 
                 6 => {
                     let schema = jtd::Schema {
-                        metadata: HashMap::new(),
-                        definitions: HashMap::new(),
+                        metadata: BTreeMap::new(),
+                        definitions: BTreeMap::new(),
                         form: jtd::Form::Values(jtd::form::Values {
                             nullable: false,
                             schema: Default::default(),
@@ -216,7 +216,7 @@ fn fuzz_with_root<R: rand::Rng>(root: &jtd::Schema, rng: &mut R, schema: &jtd::S
                 return Value::Null;
             }
 
-            let mut members = HashMap::new();
+            let mut members = BTreeMap::new();
 
             let mut required_keys: Vec<_> = required.keys().cloned().collect();
             required_keys.sort();
