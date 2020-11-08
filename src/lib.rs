@@ -58,7 +58,7 @@ const MAX_SEQ_LENGTH: u8 = 8;
 ///
 /// assert_eq!(jtd_fuzz::fuzz(&schema, &mut rng), json!({
 ///     "name": "e",
-///     "createdAt": "1931-10-18T14:26:10-05:14",
+///     "createdAt": "1931-10-18T15:44:45-03:55",
 ///     "favoriteNumbers": [166, 142]
 /// }));
 /// ```
@@ -161,9 +161,6 @@ fn fuzz_with_root<R: rand::Rng>(root: &jtd::Schema, rng: &mut R, schema: &jtd::S
                 jtd::form::TypeValue::Timestamp => {
                     use chrono::TimeZone;
 
-                    // For timestamp generation, we're going to be real
-                    // psychotic.
-                    //
                     // We'll generate timestamps with some random seconds offset
                     // from UTC. Most of these random offsets will never have
                     // been used historically, but they can nonetheless be used
@@ -172,7 +169,17 @@ fn fuzz_with_root<R: rand::Rng>(root: &jtd::Schema, rng: &mut R, schema: &jtd::S
                     // Although timestamp_millis accepts an i64, not all values
                     // in that range are permissible. The i32 range is entirely
                     // safe.
-                    chrono::FixedOffset::east(rng.gen_range(-86_400 + 1, 86_400 - 1))
+                    //
+                    // Java's java.time.ZoneOffset restricts offsets to no more
+                    // than 18 hours from UTC:
+                    //
+                    // https://docs.oracle.com/javase/8/docs/api/java/time/ZoneOffset.html
+                    //
+                    // To make jtd-fuzz work out of the box with the Java
+                    // ecosystem, we will limit ourselves to the same range of
+                    // offsets.
+                    let max_offset = 18 * 60 * 60;
+                    chrono::FixedOffset::east(rng.gen_range(-max_offset, max_offset))
                         .timestamp(rng.gen::<i32>() as i64, 0)
                         .to_rfc3339()
                         .into()
