@@ -2,7 +2,7 @@
 
 use rand::seq::IteratorRandom;
 use serde_json::Value;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 // Max length when generating "sequences" of things, such as strings, arrays,
 // and objects.
@@ -246,14 +246,26 @@ fn fuzz_with_root<R: rand::Rng>(root: &jtd::Schema, rng: &mut R, schema: &jtd::S
             }
 
             if additional {
+                // Go's encoding/json package, which implements JSON
+                // serialization/deserialization, is case-insensitive on inputs.
+                //
+                // In order to generate fuzzed data that's compatible with Go,
+                // we'll avoid generating "additional" properties that are
+                // case-insensitively equal to any required or optional property
+                // from the schema.
+                //
+                // Since we'll only generate ASCII properties here, we don't
+                // need to worry about implementing proper Unicode folding.
+                let defined_properties_lowercase: BTreeSet<_> = required
+                    .keys()
+                    .chain(optional.keys())
+                    .map(|s| s.to_lowercase())
+                    .collect();
+
                 for _ in 0..rng.gen_range(0, MAX_SEQ_LENGTH) {
                     let key = fuzz_string(rng);
 
-                    // It would be wrong for this code to check if
-                    // members.contains_key, because that would leave open the
-                    // possibility for this code to produce an optional property
-                    // that we elected not to generate previously.
-                    if !required.contains_key(&key) && !optional.contains_key(&key) {
+                    if !defined_properties_lowercase.contains(&key.to_lowercase()) {
                         members.insert(key, fuzz_with_root(root, rng, &Default::default()));
                     }
                 }
