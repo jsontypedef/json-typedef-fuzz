@@ -9,6 +9,8 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - run: cargo publish
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
   create_release:
     runs-on: ubuntu-latest
