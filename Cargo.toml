@@ -1,5 +1,5 @@
 [package]
-name = "jtd_fuzz"
+name = "jtd-fuzz"
 description = "Generates example data from JSON Typedef schemas"
 version = "0.1.18"
 license = "MIT"
