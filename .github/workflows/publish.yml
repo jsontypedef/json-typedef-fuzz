@@ -4,6 +4,11 @@ on:
       - v*
 
 jobs:
+  publish_crate:
+    runs-on: ubuntu-latest
+    steps:
+      - run: cargo publish
+
   create_release:
     runs-on: ubuntu-latest
     outputs:
