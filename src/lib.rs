@@ -58,7 +58,7 @@ const MAX_SEQ_LENGTH: u8 = 8;
 ///
 /// assert_eq!(jtd_fuzz::fuzz(&schema, &mut rng), json!({
 ///     "name": "e",
-///     "createdAt": "1931-10-18T15:44:45-03:55",
+///     "createdAt": "1931-10-18T16:37:09-03:03",
 ///     "favoriteNumbers": [166, 142]
 /// }));
 /// ```
@@ -170,15 +170,22 @@ fn fuzz_with_root<R: rand::Rng>(root: &jtd::Schema, rng: &mut R, schema: &jtd::S
                     // in that range are permissible. The i32 range is entirely
                     // safe.
                     //
+                    // However, UTC offsets present a practical complication:
+                    //
                     // Java's java.time.ZoneOffset restricts offsets to no more
                     // than 18 hours from UTC:
                     //
                     // https://docs.oracle.com/javase/8/docs/api/java/time/ZoneOffset.html
                     //
-                    // To make jtd-fuzz work out of the box with the Java
-                    // ecosystem, we will limit ourselves to the same range of
-                    // offsets.
-                    let max_offset = 18 * 60 * 60;
+                    // .NET's System.DateTimeOffset restricts offsets to no more
+                    // than 14 hours from UTC:
+                    //
+                    // https://docs.microsoft.com/en-us/dotnet/api/system.datetimeoffset.tooffset?view=net-5.0
+                    //
+                    // To make jtd-fuzz work out of the box with these
+                    // ecosystems, we will limit ourselves to the most selective
+                    // of these time ranges.
+                    let max_offset = 14 * 60 * 60;
                     chrono::FixedOffset::east(rng.gen_range(-max_offset, max_offset))
                         .timestamp(rng.gen::<i32>() as i64, 0)
                         .to_rfc3339()
