@@ -1,5 +1,6 @@
 //! Generate fuzzed data from a JSON Type Definition schema.
 
+use jtd::{Schema, Type};
 use rand::seq::IteratorRandom;
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
@@ -36,12 +37,11 @@ const MAX_SEQ_LENGTH: u8 = 8;
 /// As an example of the sort of data this function may produce:
 ///
 /// ```
-/// use std::convert::TryInto;
 /// use serde_json::json;
 /// use rand::SeedableRng;
 ///
 /// // An example schema we can test against.
-/// let schema: jtd::SerdeSchema = serde_json::from_value(json!({
+/// let schema = jtd::Schema::from_serde_schema(serde_json::from_value(json!({
 ///     "properties": {
 ///         "name": { "type": "string" },
 ///         "createdAt": { "type": "timestamp" },
@@ -49,9 +49,7 @@ const MAX_SEQ_LENGTH: u8 = 8;
 ///             "elements": { "type": "uint8" }
 ///         }
 ///     }
-/// })).unwrap();
-///
-/// let schema: jtd::Schema = schema.try_into().unwrap();
+/// })).unwrap()).unwrap();
 ///
 /// // A hard-coded RNG, so that the output is predictable.
 /// let mut rng = rand_pcg::Pcg32::seed_from_u64(8927);
@@ -62,13 +60,13 @@ const MAX_SEQ_LENGTH: u8 = 8;
 ///     "favoriteNumbers": [166, 142]
 /// }));
 /// ```
-pub fn fuzz<R: rand::Rng>(schema: &jtd::Schema, rng: &mut R) -> Value {
+pub fn fuzz<R: rand::Rng>(schema: &Schema, rng: &mut R) -> Value {
     fuzz_with_root(schema, rng, schema)
 }
 
-fn fuzz_with_root<R: rand::Rng>(root: &jtd::Schema, rng: &mut R, schema: &jtd::Schema) -> Value {
-    match schema.form {
-        jtd::Form::Empty => {
+fn fuzz_with_root<R: rand::Rng>(root: &Schema, rng: &mut R, schema: &Schema) -> Value {
+    match schema {
+        Schema::Empty { .. } => {
             // Generate one of null, boolean, uint8, float64, string, the
             // elements form, or the values form. The reasoning is that it's
             // reasonable behavior, and has a good chance of helping users catch
@@ -99,12 +97,13 @@ fn fuzz_with_root<R: rand::Rng>(root: &jtd::Schema, rng: &mut R, schema: &jtd::S
                 // All the following cases are "recursive" cases. See above for
                 // why it's important these come after the "primitive" cases.
                 5 => {
-                    let schema = jtd::Schema {
-                        metadata: BTreeMap::new(),
-                        definitions: BTreeMap::new(),
-                        form: jtd::Form::Elements(jtd::form::Elements {
-                            nullable: false,
-                            schema: Default::default(),
+                    let schema = Schema::Elements {
+                        metadata: Default::default(),
+                        definitions: Default::default(),
+                        nullable: false,
+                        elements: Box::new(Schema::Empty {
+                            metadata: Default::default(),
+                            definitions: Default::default(),
                         }),
                     };
 
@@ -112,12 +111,13 @@ fn fuzz_with_root<R: rand::Rng>(root: &jtd::Schema, rng: &mut R, schema: &jtd::S
                 }
 
                 6 => {
-                    let schema = jtd::Schema {
-                        metadata: BTreeMap::new(),
-                        definitions: BTreeMap::new(),
-                        form: jtd::Form::Values(jtd::form::Values {
-                            nullable: false,
-                            schema: Default::default(),
+                    let schema = Schema::Values {
+                        metadata: Default::default(),
+                        definitions: Default::default(),
+                        nullable: false,
+                        values: Box::new(Schema::Empty {
+                            metadata: Default::default(),
+                            definitions: Default::default(),
                         }),
                     };
 
@@ -128,37 +128,37 @@ fn fuzz_with_root<R: rand::Rng>(root: &jtd::Schema, rng: &mut R, schema: &jtd::S
             }
         }
 
-        jtd::Form::Ref(jtd::form::Ref {
-            ref definition,
-            nullable,
-        }) => {
-            if nullable && rng.gen() {
+        Schema::Ref {
+            ref ref_, nullable, ..
+        } => {
+            if *nullable && rng.gen() {
                 return Value::Null;
             }
 
-            fuzz_with_root(root, rng, &root.definitions[definition])
+            fuzz_with_root(root, rng, &root.definitions()[ref_])
         }
 
-        jtd::Form::Type(jtd::form::Type {
-            ref type_value,
+        Schema::Type {
+            ref type_,
             nullable,
-        }) => {
-            if nullable && rng.gen() {
+            ..
+        } => {
+            if *nullable && rng.gen() {
                 return Value::Null;
             }
 
-            match type_value {
-                jtd::form::TypeValue::Boolean => rng.gen::<bool>().into(),
-                jtd::form::TypeValue::Float32 => rng.gen::<f32>().into(),
-                jtd::form::TypeValue::Float64 => rng.gen::<f64>().into(),
-                jtd::form::TypeValue::Int8 => rng.gen::<i8>().into(),
-                jtd::form::TypeValue::Uint8 => rng.gen::<u8>().into(),
-                jtd::form::TypeValue::Int16 => rng.gen::<i16>().into(),
-                jtd::form::TypeValue::Uint16 => rng.gen::<u16>().into(),
-                jtd::form::TypeValue::Int32 => rng.gen::<i32>().into(),
-                jtd::form::TypeValue::Uint32 => rng.gen::<u32>().into(),
-                jtd::form::TypeValue::String => fuzz_string(rng).into(),
-                jtd::form::TypeValue::Timestamp => {
+            match type_ {
+                Type::Boolean => rng.gen::<bool>().into(),
+                Type::Float32 => rng.gen::<f32>().into(),
+                Type::Float64 => rng.gen::<f64>().into(),
+                Type::Int8 => rng.gen::<i8>().into(),
+                Type::Uint8 => rng.gen::<u8>().into(),
+                Type::Int16 => rng.gen::<i16>().into(),
+                Type::Uint16 => rng.gen::<u16>().into(),
+                Type::Int32 => rng.gen::<i32>().into(),
+                Type::Uint32 => rng.gen::<u32>().into(),
+                Type::String => fuzz_string(rng).into(),
+                Type::Timestamp => {
                     use chrono::TimeZone;
 
                     // We'll generate timestamps with some random seconds offset
@@ -194,53 +194,55 @@ fn fuzz_with_root<R: rand::Rng>(root: &jtd::Schema, rng: &mut R, schema: &jtd::S
             }
         }
 
-        jtd::Form::Enum(jtd::form::Enum {
-            ref values,
+        Schema::Enum {
+            ref enum_,
             nullable,
-        }) => {
-            if nullable && rng.gen() {
+            ..
+        } => {
+            if *nullable && rng.gen() {
                 return Value::Null;
             }
 
-            values.iter().choose(rng).unwrap().clone().into()
+            enum_.iter().choose(rng).unwrap().clone().into()
         }
 
-        jtd::Form::Elements(jtd::form::Elements {
-            schema: ref sub_schema,
+        Schema::Elements {
+            ref elements,
             nullable,
-        }) => {
-            if nullable && rng.gen() {
+            ..
+        } => {
+            if *nullable && rng.gen() {
                 return Value::Null;
             }
 
             (0..rng.gen_range(0, MAX_SEQ_LENGTH))
-                .map(|_| fuzz_with_root(root, rng, sub_schema))
+                .map(|_| fuzz_with_root(root, rng, elements))
                 .collect::<Vec<_>>()
                 .into()
         }
 
-        jtd::Form::Properties(jtd::form::Properties {
-            ref required,
-            ref optional,
-            additional,
+        Schema::Properties {
+            ref properties,
+            ref optional_properties,
+            additional_properties,
             nullable,
             ..
-        }) => {
-            if nullable && rng.gen() {
+        } => {
+            if *nullable && rng.gen() {
                 return Value::Null;
             }
 
             let mut members = BTreeMap::new();
 
-            let mut required_keys: Vec<_> = required.keys().cloned().collect();
+            let mut required_keys: Vec<_> = properties.keys().cloned().collect();
             required_keys.sort();
 
             for k in required_keys {
-                let v = fuzz_with_root(root, rng, &required[&k]);
+                let v = fuzz_with_root(root, rng, &properties[&k]);
                 members.insert(k, v);
             }
 
-            let mut optional_keys: Vec<_> = optional.keys().cloned().collect();
+            let mut optional_keys: Vec<_> = optional_properties.keys().cloned().collect();
             optional_keys.sort();
 
             for k in optional_keys {
@@ -248,11 +250,11 @@ fn fuzz_with_root<R: rand::Rng>(root: &jtd::Schema, rng: &mut R, schema: &jtd::S
                     continue;
                 }
 
-                let v = fuzz_with_root(root, rng, &optional[&k]);
+                let v = fuzz_with_root(root, rng, &optional_properties[&k]);
                 members.insert(k, v);
             }
 
-            if additional {
+            if *additional_properties {
                 // Go's encoding/json package, which implements JSON
                 // serialization/deserialization, is case-insensitive on inputs.
                 //
@@ -263,9 +265,9 @@ fn fuzz_with_root<R: rand::Rng>(root: &jtd::Schema, rng: &mut R, schema: &jtd::S
                 //
                 // Since we'll only generate ASCII properties here, we don't
                 // need to worry about implementing proper Unicode folding.
-                let defined_properties_lowercase: BTreeSet<_> = required
+                let defined_properties_lowercase: BTreeSet<_> = properties
                     .keys()
-                    .chain(optional.keys())
+                    .chain(optional_properties.keys())
                     .map(|s| s.to_lowercase())
                     .collect();
 
@@ -273,7 +275,16 @@ fn fuzz_with_root<R: rand::Rng>(root: &jtd::Schema, rng: &mut R, schema: &jtd::S
                     let key = fuzz_string(rng);
 
                     if !defined_properties_lowercase.contains(&key.to_lowercase()) {
-                        members.insert(key, fuzz_with_root(root, rng, &Default::default()));
+                        members.insert(
+                            key,
+                            fuzz(
+                                &Schema::Empty {
+                                    metadata: Default::default(),
+                                    definitions: Default::default(),
+                                },
+                                rng,
+                            ),
+                        );
                     }
                 }
             }
@@ -284,26 +295,28 @@ fn fuzz_with_root<R: rand::Rng>(root: &jtd::Schema, rng: &mut R, schema: &jtd::S
                 .into()
         }
 
-        jtd::Form::Values(jtd::form::Values {
-            schema: ref sub_schema,
+        Schema::Values {
+            ref values,
             nullable,
-        }) => {
-            if nullable && rng.gen() {
+            ..
+        } => {
+            if *nullable && rng.gen() {
                 return Value::Null;
             }
 
             (0..rng.gen_range(0, MAX_SEQ_LENGTH))
-                .map(|_| (fuzz_string(rng), fuzz_with_root(root, rng, sub_schema)))
+                .map(|_| (fuzz_string(rng), fuzz_with_root(root, rng, values)))
                 .collect::<serde_json::Map<String, Value>>()
                 .into()
         }
 
-        jtd::Form::Discriminator(jtd::form::Discriminator {
+        Schema::Discriminator {
             ref mapping,
             ref discriminator,
             nullable,
-        }) => {
-            if nullable && rng.gen() {
+            ..
+        } => {
+            if *nullable && rng.gen() {
                 return Value::Null;
             }
 
@@ -327,7 +340,8 @@ fn fuzz_string<R: rand::Rng>(rng: &mut R) -> String {
 
 #[cfg(test)]
 mod tests {
-    use serde_json::{json, Value};
+    use super::*;
+    use serde_json::json;
 
     #[test]
     fn test_fuzz_empty() {
@@ -430,21 +444,14 @@ mod tests {
 
     fn assert_valid_fuzz(schema: Value) {
         use rand::SeedableRng;
-        use std::convert::TryInto;
 
-        let schema: jtd::SerdeSchema = serde_json::from_value(schema).unwrap();
-        let schema: jtd::Schema = schema.try_into().unwrap();
         let mut rng = rand_pcg::Pcg32::seed_from_u64(8927);
-
-        let validator = jtd::Validator {
-            max_errors: None,
-            max_depth: None,
-        };
+        let schema = Schema::from_serde_schema(serde_json::from_value(schema).unwrap()).unwrap();
 
         // Poor man's fuzzing.
         for _ in 0..1000 {
             let instance = super::fuzz(&schema, &mut rng);
-            let errors = validator.validate(&schema, &instance).unwrap();
+            let errors = jtd::validate(&schema, &instance, Default::default()).unwrap();
             assert!(errors.is_empty(), "{}", instance);
         }
     }
