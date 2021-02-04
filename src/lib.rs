@@ -453,7 +453,7 @@ fn fuzz_with_root<R: rand::Rng>(root: &Schema, rng: &mut R, schema: &Schema) -> 
                 return Value::Null;
             }
 
-            (0..rng.gen_range(0..=MAX_SEQ_LENGTH))
+            (0..rng.gen_range(0..MAX_SEQ_LENGTH))
                 .map(|_| fuzz_with_root(root, rng, elements))
                 .collect::<Vec<_>>()
                 .into()
@@ -509,7 +509,7 @@ fn fuzz_with_root<R: rand::Rng>(root: &Schema, rng: &mut R, schema: &Schema) -> 
                     .map(|s| s.to_lowercase())
                     .collect();
 
-                for _ in 0..rng.gen_range(0..=MAX_SEQ_LENGTH) {
+                for _ in 0..rng.gen_range(0..MAX_SEQ_LENGTH) {
                     let key = fuzz_string(rng);
 
                     if !defined_properties_lowercase.contains(&key.to_lowercase()) {
@@ -542,7 +542,7 @@ fn fuzz_with_root<R: rand::Rng>(root: &Schema, rng: &mut R, schema: &Schema) -> 
                 return Value::Null;
             }
 
-            (0..rng.gen_range(0..=MAX_SEQ_LENGTH))
+            (0..rng.gen_range(0..MAX_SEQ_LENGTH))
                 .map(|_| (fuzz_string(rng), fuzz_with_root(root, rng, values)))
                 .collect::<serde_json::Map<String, Value>>()
                 .into()
@@ -571,7 +571,7 @@ fn fuzz_with_root<R: rand::Rng>(root: &Schema, rng: &mut R, schema: &Schema) -> 
 }
 
 fn fuzz_string<R: rand::Rng>(rng: &mut R) -> String {
-    (0..rng.gen_range(0..=MAX_SEQ_LENGTH))
+    (0..rng.gen_range(0..MAX_SEQ_LENGTH))
         .map(|_| rng.gen_range(32u8..=127u8) as char)
         .collect::<String>()
 }
