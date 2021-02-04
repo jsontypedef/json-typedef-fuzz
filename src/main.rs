@@ -1,9 +1,9 @@
-use anyhow::{format_err, Context, Result};
+use anyhow::{Context, Result};
 use clap::{crate_version, App, AppSettings, Arg};
-use jtd::{Schema, SerdeSchema};
+use jtd::{Schema};
 use rand::SeedableRng;
 use rand_pcg::Pcg32;
-use std::convert::TryInto;
+
 use std::fs::File;
 use std::io::{stdin, BufReader, Read};
 
