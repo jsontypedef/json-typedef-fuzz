@@ -1,6 +1,6 @@
 use anyhow::{Context, Result};
 use clap::{crate_version, App, AppSettings, Arg};
-use jtd::{Schema};
+use jtd::Schema;
 use rand::SeedableRng;
 use rand_pcg::Pcg32;
 
