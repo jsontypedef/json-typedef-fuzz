@@ -7,11 +7,11 @@ authors = ["JSON Typedef Contributors"]
 edition = "2018"
 
 [dependencies]
-jtd = "^0.3"
-serde_json = "^1"
-rand = "^0.8"
-chrono = "^0.4"
 anyhow = "^1"
-clap = "^2"
-rand_pcg = "^0.3"
+chrono = "^0.4"
+clap = { version = "2.33.3", features = ["yaml"] }
 faker_rand = "0.1"
+jtd = "^0.3"
+rand = "^0.8"
+rand_pcg = "^0.3"
+serde_json = "^1"

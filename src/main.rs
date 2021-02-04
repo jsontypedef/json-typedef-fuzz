@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use clap::{crate_version, App, AppSettings, Arg};
+use clap::{load_yaml, crate_version, App, AppSettings};
 use jtd::Schema;
 use rand::SeedableRng;
 use rand_pcg::Pcg32;
@@ -8,25 +8,10 @@ use std::fs::File;
 use std::io::{stdin, BufReader, Read};
 
 fn main() -> Result<()> {
-    let matches = App::new("jtd-fuzz")
-        .version(crate_version!())
-        .about("Generate random JSON documents from a given JSON Typedef schema")
+    let cli_yaml = load_yaml!("cli.yaml");
+    let matches = App::from(cli_yaml)
         .setting(AppSettings::ColoredHelp)
-        .arg(
-            Arg::with_name("num-values")
-                .help("How many values to generate.")
-                .short("n")
-                .long("num-values")
-                .takes_value(true),
-        )
-        .arg(
-            Arg::with_name("seed")
-                .help("Random number generator seed.")
-                .short("s")
-                .long("seed")
-                .takes_value(true),
-        )
-        .arg(Arg::with_name("file").help("Read input from this file, instead of STDIN"))
+        .version(crate_version!())
         .get_matches();
 
     // Parse num-values and seed first, so that we can give the user an error
@@ -50,7 +35,7 @@ fn main() -> Result<()> {
         None
     };
 
-    let input: Box<dyn Read> = if let Some(file) = matches.value_of("file") {
+    let input: Box<dyn Read> = if let Some(file) = matches.value_of("input") {
         Box::new(BufReader::new(File::open(file)?))
     } else {
         Box::new(stdin())

@@ -1,0 +1,17 @@
+name: jtd-fuzz
+about: Generate example JSON data from a JSON Typedef schema
+args:
+  - input:
+      help: Schema to generate data from. To read from stdin, use "-"
+      required: true
+      default_value: "-"
+  - num-values:
+      help: How many values to generate
+      short: n
+      long: num-values
+      takes_value: true
+  - seed:
+      help: Random number generator seed
+      short: s
+      long: seed
+      takes_value: true
