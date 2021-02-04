@@ -23,7 +23,7 @@
 //! let mut rng = rand_pcg::Pcg32::seed_from_u64(8927);
 //!
 //! assert_eq!(jtd_fuzz::fuzz(&schema, &mut rng), json!({
-//!     "name": "e",
+//!     "name": "f",
 //!     "createdAt": "1931-10-18T16:37:09-03:03",
 //!     "favoriteNumbers": [166, 142]
 //! }));
