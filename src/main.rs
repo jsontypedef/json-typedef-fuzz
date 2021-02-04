@@ -35,14 +35,13 @@ fn main() -> Result<()> {
         None
     };
 
-    let input: Box<dyn Read> = if let Some(file) = matches.value_of("input") {
-        Box::new(BufReader::new(File::open(file)?))
-    } else {
-        Box::new(stdin())
-    };
+    let reader = BufReader::new(match matches.value_of("input").unwrap() {
+        "-" => Box::new(stdin()) as Box<dyn Read>,
+        file @ _ => Box::new(File::open(file)?) as Box<dyn Read>,
+    });
 
     let schema = Schema::from_serde_schema(
-        serde_json::from_reader(input).with_context(|| "Failed to parse schema")?,
+        serde_json::from_reader(reader).with_context(|| "Failed to parse schema")?,
     )
     .with_context(|| "Malformed schema")?;
 
