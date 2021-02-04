@@ -63,19 +63,6 @@ fn main() -> Result<()> {
 
     schema.validate().with_context(|| "Invalid schema")?;
 
-    // let serde_schema: SerdeSchema =
-    //     serde_json::from_reader(input).with_context(|| format!("Failed to parse schema"))?;
-
-    // let schema: Schema = serde_schema
-    //     .try_into()
-    //     .map_err(|err| format_err!("invalid schema: {:?}", err))
-    //     .with_context(|| format!("Failed to load schema"))?;
-
-    // schema
-    //     .validate()
-    //     .map_err(|err| format_err!("invalid schema: {:?}", err))
-    //     .with_context(|| format!("Failed to validate schema"))?;
-
     if let Some(n) = num_values {
         for _ in 0..n {
             println!("{}", jtd_fuzz::fuzz(&schema, &mut rng));
