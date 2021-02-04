@@ -23,7 +23,7 @@ On macOS, you can install `jtd-fuzz` via Homebrew:
 brew install jsontypedef/jsontypedef/jtd-fuzz
 ```
 
-For all other platforms, you can download and extract the binary yoursel from
+For all other platforms, you can download and extract the binary yourself from
 [the latest release][latest]. You can also install using `cargo` by running:
 
 ```bash
@@ -65,8 +65,9 @@ jtd-fuzz -n 5 foo.jtd.json
 ### Generating emails, names, etc. with `fuzzHint`
 
 Oftentimes, it's useful for `jtd-fuzz` to generate specific sorts of strings,
-instead of the generic nonsense strings you get by default with `{"type": "string"}`. You can customize `jtd-fuzz`'s output using the `fuzzHint` metadata
-property. For example, this schema:
+instead of the generic nonsense strings you get by default with schemas whose
+`type` is `string`. You can customize `jtd-fuzz`'s output using the `fuzzHint`
+metadata property. For example, this schema:
 
 ```json
 {
