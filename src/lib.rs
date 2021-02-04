@@ -1,5 +1,35 @@
 //! Generate fuzzed data from a JSON Type Definition schema.
+//!
+//! # Quick start
+//!
+//! Here's how you can use [`fuzz`] to generate dummy data from a schema.
+//!
+//! ```
+//! use serde_json::json;
+//! use rand::SeedableRng;
+//!
+//! // An example schema we can test against.
+//! let schema = jtd::Schema::from_serde_schema(serde_json::from_value(json!({
+//!     "properties": {
+//!         "name": { "type": "string" },
+//!         "createdAt": { "type": "timestamp" },
+//!         "favoriteNumbers": {
+//!             "elements": { "type": "uint8" }
+//!         }
+//!     }
+//! })).unwrap()).unwrap();
+//!
+//! // A hard-coded RNG, so that the output is predictable.
+//! let mut rng = rand_pcg::Pcg32::seed_from_u64(8927);
+//!
+//! assert_eq!(jtd_fuzz::fuzz(&schema, &mut rng), json!({
+//!     "name": "f",
+//!     "createdAt": "1931-10-18T16:37:09-03:03",
+//!     "favoriteNumbers": [166, 142]
+//! }));
+//! ```
 
+use jtd::{Schema, Type};
 use rand::seq::IteratorRandom;
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
@@ -8,10 +38,17 @@ use std::collections::{BTreeMap, BTreeSet};
 // and objects.
 const MAX_SEQ_LENGTH: u8 = 8;
 
+// Key in metadata that, if present and one of the recognized values, will
+// result in a specific sort of data being produced instead of the generic
+// default.
+const METADATA_KEY_FUZZ_HINT: &'static str = "fuzzHint";
+
 /// Generates a single random JSON value satisfying a given schema.
 ///
 /// The generated output is purely a function of the given schema and RNG. It is
 /// guaranteed that the returned data satisfies the given schema.
+///
+/// # Invariants for generated data
 ///
 /// The output of this function is not guaranteed to remain the same between
 /// different versions of this crate; if you use a different version of this
@@ -33,42 +70,82 @@ const MAX_SEQ_LENGTH: u8 = 8;
 ///   will not necessarily be "historical"; some offsets may never have been
 ///   used in the real world.
 ///
-/// As an example of the sort of data this function may produce:
+/// # Using `fuzzHint`
+///
+/// If you want to generate a specific sort of string from your schema, you can
+/// use the `fuzzHint` metadata property to customize output. For example, if
+/// you'd like to generate a fake email instead of a generic string, you can use
+/// a `fuzzHint` of `en_us/internet/email`:
 ///
 /// ```
-/// use std::convert::TryInto;
 /// use serde_json::json;
 /// use rand::SeedableRng;
 ///
-/// // An example schema we can test against.
-/// let schema: jtd::SerdeSchema = serde_json::from_value(json!({
-///     "properties": {
-///         "name": { "type": "string" },
-///         "createdAt": { "type": "timestamp" },
-///         "favoriteNumbers": {
-///             "elements": { "type": "uint8" }
-///         }
+/// let schema = jtd::Schema::from_serde_schema(serde_json::from_value(json!({
+///     "type": "string",
+///     "metadata": {
+///         "fuzzHint": "en_us/internet/email"
 ///     }
-/// })).unwrap();
+/// })).unwrap()).unwrap();
 ///
-/// let schema: jtd::Schema = schema.try_into().unwrap();
-///
-/// // A hard-coded RNG, so that the output is predictable.
 /// let mut rng = rand_pcg::Pcg32::seed_from_u64(8927);
-///
-/// assert_eq!(jtd_fuzz::fuzz(&schema, &mut rng), json!({
-///     "name": "e",
-///     "createdAt": "1931-10-18T16:37:09-03:03",
-///     "favoriteNumbers": [166, 142]
-/// }));
+/// assert_eq!(jtd_fuzz::fuzz(&schema, &mut rng), json!("prenner3@fay.com"));
 /// ```
-pub fn fuzz<R: rand::Rng>(schema: &jtd::Schema, rng: &mut R) -> Value {
+///
+/// `fuzzHint` will only be honored for schemas with `type` of `string`. It will
+/// not be honored for empty schemas. If `fuzzHint` does not have one of the
+/// values listed below, then its value will be ignored.
+///
+/// The possible values for `fuzzHint` are:
+///
+/// * [`en_us/addresses/city_name`][`faker_rand::en_us::addresses::CityName`]
+/// * [`en_us/addresses/division_abbreviation`][`faker_rand::en_us::addresses::DivisionAbbreviation`]
+/// * [`en_us/addresses/division`][`faker_rand::en_us::addresses::Division`]
+/// * [`en_us/addresses/postal_code`][`faker_rand::en_us::addresses::PostalCode`]
+/// * [`en_us/addresses/secondary_address`][`faker_rand::en_us::addresses::SecondaryAddress`]
+/// * [`en_us/addresses/street_address`][`faker_rand::en_us::addresses::StreetAddress`]
+/// * [`en_us/addresses/street_name`][`faker_rand::en_us::addresses::StreetName`]
+/// * [`en_us/company/company_name`][`faker_rand::en_us::company::CompanyName`]
+/// * [`en_us/company/slogan`][`faker_rand::en_us::company::Slogan`]
+/// * [`en_us/internet/domain`][`faker_rand::en_us::internet::Domain`]
+/// * [`en_us/internet/email`][`faker_rand::en_us::internet::Email`]
+/// * [`en_us/internet/username`][`faker_rand::en_us::internet::Username`]
+/// * [`en_us/names/first_name`][`faker_rand::en_us::names::FirstName`]
+/// * [`en_us/names/full_name`][`faker_rand::en_us::names::FullName`]
+/// * [`en_us/names/last_name`][`faker_rand::en_us::names::LastName`]
+/// * [`en_us/names/name_prefix`][`faker_rand::en_us::names::NamePrefix`]
+/// * [`en_us/names/name_suffix`][`faker_rand::en_us::names::NameSuffix`]
+/// * [`en_us/phones/phone_number`][`faker_rand::en_us::phones::PhoneNumber`]
+/// * [`fr_fr/addresses/address`][`faker_rand::fr_fr::addresses::Address`]
+/// * [`fr_fr/addresses/city_name`][`faker_rand::fr_fr::addresses::CityName`]
+/// * [`fr_fr/addresses/division`][`faker_rand::fr_fr::addresses::Division`]
+/// * [`fr_fr/addresses/postal_code`][`faker_rand::fr_fr::addresses::PostalCode`]
+/// * [`fr_fr/addresses/secondary_address`][`faker_rand::fr_fr::addresses::SecondaryAddress`]
+/// * [`fr_fr/addresses/street_address`][`faker_rand::fr_fr::addresses::StreetAddress`]
+/// * [`fr_fr/addresses/street_name`][`faker_rand::fr_fr::addresses::StreetName`]
+/// * [`fr_fr/company/company_name`][`faker_rand::fr_fr::company::CompanyName`]
+/// * [`fr_fr/internet/domain`][`faker_rand::fr_fr::internet::Domain`]
+/// * [`fr_fr/internet/email`][`faker_rand::fr_fr::internet::Email`]
+/// * [`fr_fr/internet/username`][`faker_rand::fr_fr::internet::Username`]
+/// * [`fr_fr/names/first_name`][`faker_rand::fr_fr::names::FirstName`]
+/// * [`fr_fr/names/full_name`][`faker_rand::fr_fr::names::FullName`]
+/// * [`fr_fr/names/last_name`][`faker_rand::fr_fr::names::LastName`]
+/// * [`fr_fr/names/name_prefix`][`faker_rand::fr_fr::names::NamePrefix`]
+/// * [`fr_fr/phones/phone_number`][`faker_rand::fr_fr::phones::PhoneNumber`]
+/// * [`lorem/word`][`faker_rand::lorem::Word`]
+/// * [`lorem/sentence`][`faker_rand::lorem::Sentence`]
+/// * [`lorem/paragraph`][`faker_rand::lorem::Paragraph`]
+/// * [`lorem/paragraphs`][`faker_rand::lorem::Paragraphs`]
+///
+/// New acceptable values for `fuzzHint` may be added to this crate within the
+/// same major version.
+pub fn fuzz<R: rand::Rng>(schema: &Schema, rng: &mut R) -> Value {
     fuzz_with_root(schema, rng, schema)
 }
 
-fn fuzz_with_root<R: rand::Rng>(root: &jtd::Schema, rng: &mut R, schema: &jtd::Schema) -> Value {
-    match schema.form {
-        jtd::Form::Empty => {
+fn fuzz_with_root<R: rand::Rng>(root: &Schema, rng: &mut R, schema: &Schema) -> Value {
+    match schema {
+        Schema::Empty { .. } => {
             // Generate one of null, boolean, uint8, float64, string, the
             // elements form, or the values form. The reasoning is that it's
             // reasonable behavior, and has a good chance of helping users catch
@@ -87,7 +164,7 @@ fn fuzz_with_root<R: rand::Rng>(root: &jtd::Schema, rng: &mut R, schema: &jtd::S
                 5 // 0 through 4
             };
 
-            let val = rng.gen_range(0, range_max_value);
+            let val = rng.gen_range(0..range_max_value);
             match val {
                 // 0-4 are cases we will always potentially generate.
                 0 => Value::Null,
@@ -99,12 +176,13 @@ fn fuzz_with_root<R: rand::Rng>(root: &jtd::Schema, rng: &mut R, schema: &jtd::S
                 // All the following cases are "recursive" cases. See above for
                 // why it's important these come after the "primitive" cases.
                 5 => {
-                    let schema = jtd::Schema {
-                        metadata: BTreeMap::new(),
-                        definitions: BTreeMap::new(),
-                        form: jtd::Form::Elements(jtd::form::Elements {
-                            nullable: false,
-                            schema: Default::default(),
+                    let schema = Schema::Elements {
+                        metadata: Default::default(),
+                        definitions: Default::default(),
+                        nullable: false,
+                        elements: Box::new(Schema::Empty {
+                            metadata: Default::default(),
+                            definitions: Default::default(),
                         }),
                     };
 
@@ -112,12 +190,13 @@ fn fuzz_with_root<R: rand::Rng>(root: &jtd::Schema, rng: &mut R, schema: &jtd::S
                 }
 
                 6 => {
-                    let schema = jtd::Schema {
-                        metadata: BTreeMap::new(),
-                        definitions: BTreeMap::new(),
-                        form: jtd::Form::Values(jtd::form::Values {
-                            nullable: false,
-                            schema: Default::default(),
+                    let schema = Schema::Values {
+                        metadata: Default::default(),
+                        definitions: Default::default(),
+                        nullable: false,
+                        values: Box::new(Schema::Empty {
+                            metadata: Default::default(),
+                            definitions: Default::default(),
                         }),
                     };
 
@@ -128,37 +207,196 @@ fn fuzz_with_root<R: rand::Rng>(root: &jtd::Schema, rng: &mut R, schema: &jtd::S
             }
         }
 
-        jtd::Form::Ref(jtd::form::Ref {
-            ref definition,
-            nullable,
-        }) => {
-            if nullable && rng.gen() {
+        Schema::Ref {
+            ref ref_, nullable, ..
+        } => {
+            if *nullable && rng.gen() {
                 return Value::Null;
             }
 
-            fuzz_with_root(root, rng, &root.definitions[definition])
+            fuzz_with_root(root, rng, &root.definitions()[ref_])
         }
 
-        jtd::Form::Type(jtd::form::Type {
-            ref type_value,
+        Schema::Type {
+            ref metadata,
+            ref type_,
             nullable,
-        }) => {
-            if nullable && rng.gen() {
+            ..
+        } => {
+            if *nullable && rng.gen() {
                 return Value::Null;
             }
 
-            match type_value {
-                jtd::form::TypeValue::Boolean => rng.gen::<bool>().into(),
-                jtd::form::TypeValue::Float32 => rng.gen::<f32>().into(),
-                jtd::form::TypeValue::Float64 => rng.gen::<f64>().into(),
-                jtd::form::TypeValue::Int8 => rng.gen::<i8>().into(),
-                jtd::form::TypeValue::Uint8 => rng.gen::<u8>().into(),
-                jtd::form::TypeValue::Int16 => rng.gen::<i16>().into(),
-                jtd::form::TypeValue::Uint16 => rng.gen::<u16>().into(),
-                jtd::form::TypeValue::Int32 => rng.gen::<i32>().into(),
-                jtd::form::TypeValue::Uint32 => rng.gen::<u32>().into(),
-                jtd::form::TypeValue::String => fuzz_string(rng).into(),
-                jtd::form::TypeValue::Timestamp => {
+            match type_ {
+                Type::Boolean => rng.gen::<bool>().into(),
+                Type::Float32 => rng.gen::<f32>().into(),
+                Type::Float64 => rng.gen::<f64>().into(),
+                Type::Int8 => rng.gen::<i8>().into(),
+                Type::Uint8 => rng.gen::<u8>().into(),
+                Type::Int16 => rng.gen::<i16>().into(),
+                Type::Uint16 => rng.gen::<u16>().into(),
+                Type::Int32 => rng.gen::<i32>().into(),
+                Type::Uint32 => rng.gen::<u32>().into(),
+                Type::String => {
+                    match metadata.get(METADATA_KEY_FUZZ_HINT).and_then(Value::as_str) {
+                        Some("en_us/addresses/address") => rng
+                            .gen::<faker_rand::en_us::addresses::Address>()
+                            .to_string()
+                            .into(),
+                        Some("en_us/addresses/city_name") => rng
+                            .gen::<faker_rand::en_us::addresses::CityName>()
+                            .to_string()
+                            .into(),
+                        Some("en_us/addresses/division") => rng
+                            .gen::<faker_rand::en_us::addresses::Division>()
+                            .to_string()
+                            .into(),
+                        Some("en_us/addresses/division_abbreviation") => rng
+                            .gen::<faker_rand::en_us::addresses::DivisionAbbreviation>()
+                            .to_string()
+                            .into(),
+                        Some("en_us/addresses/postal_code") => rng
+                            .gen::<faker_rand::en_us::addresses::PostalCode>()
+                            .to_string()
+                            .into(),
+                        Some("en_us/addresses/secondary_address") => rng
+                            .gen::<faker_rand::en_us::addresses::SecondaryAddress>()
+                            .to_string()
+                            .into(),
+                        Some("en_us/addresses/street_address") => rng
+                            .gen::<faker_rand::en_us::addresses::StreetAddress>()
+                            .to_string()
+                            .into(),
+                        Some("en_us/addresses/street_name") => rng
+                            .gen::<faker_rand::en_us::addresses::StreetName>()
+                            .to_string()
+                            .into(),
+                        Some("en_us/company/company_name") => rng
+                            .gen::<faker_rand::en_us::company::CompanyName>()
+                            .to_string()
+                            .into(),
+                        Some("en_us/company/slogan") => rng
+                            .gen::<faker_rand::en_us::company::Slogan>()
+                            .to_string()
+                            .into(),
+                        Some("en_us/internet/domain") => rng
+                            .gen::<faker_rand::en_us::internet::Domain>()
+                            .to_string()
+                            .into(),
+                        Some("en_us/internet/email") => rng
+                            .gen::<faker_rand::en_us::internet::Email>()
+                            .to_string()
+                            .into(),
+                        Some("en_us/internet/username") => rng
+                            .gen::<faker_rand::en_us::internet::Username>()
+                            .to_string()
+                            .into(),
+                        Some("en_us/names/first_name") => rng
+                            .gen::<faker_rand::en_us::names::FirstName>()
+                            .to_string()
+                            .into(),
+                        Some("en_us/names/full_name") => rng
+                            .gen::<faker_rand::en_us::names::FullName>()
+                            .to_string()
+                            .into(),
+                        Some("en_us/names/last_name") => rng
+                            .gen::<faker_rand::en_us::names::LastName>()
+                            .to_string()
+                            .into(),
+                        Some("en_us/names/name_prefix") => rng
+                            .gen::<faker_rand::en_us::names::NamePrefix>()
+                            .to_string()
+                            .into(),
+                        Some("en_us/names/name_suffix") => rng
+                            .gen::<faker_rand::en_us::names::NameSuffix>()
+                            .to_string()
+                            .into(),
+                        Some("en_us/phones/phone_number") => rng
+                            .gen::<faker_rand::en_us::phones::PhoneNumber>()
+                            .to_string()
+                            .into(),
+                        Some("fr_fr/addresses/address") => rng
+                            .gen::<faker_rand::fr_fr::addresses::Address>()
+                            .to_string()
+                            .into(),
+                        Some("fr_fr/addresses/city_name") => rng
+                            .gen::<faker_rand::fr_fr::addresses::CityName>()
+                            .to_string()
+                            .into(),
+                        Some("fr_fr/addresses/division") => rng
+                            .gen::<faker_rand::fr_fr::addresses::Division>()
+                            .to_string()
+                            .into(),
+                        Some("fr_fr/addresses/postal_code") => rng
+                            .gen::<faker_rand::fr_fr::addresses::PostalCode>()
+                            .to_string()
+                            .into(),
+                        Some("fr_fr/addresses/secondary_address") => rng
+                            .gen::<faker_rand::fr_fr::addresses::SecondaryAddress>()
+                            .to_string()
+                            .into(),
+                        Some("fr_fr/addresses/street_address") => rng
+                            .gen::<faker_rand::fr_fr::addresses::StreetAddress>()
+                            .to_string()
+                            .into(),
+                        Some("fr_fr/addresses/street_name") => rng
+                            .gen::<faker_rand::fr_fr::addresses::StreetName>()
+                            .to_string()
+                            .into(),
+                        Some("fr_fr/company/company_name") => rng
+                            .gen::<faker_rand::fr_fr::company::CompanyName>()
+                            .to_string()
+                            .into(),
+                        Some("fr_fr/internet/domain") => rng
+                            .gen::<faker_rand::fr_fr::internet::Domain>()
+                            .to_string()
+                            .into(),
+                        Some("fr_fr/internet/email") => rng
+                            .gen::<faker_rand::fr_fr::internet::Email>()
+                            .to_string()
+                            .into(),
+                        Some("fr_fr/internet/username") => rng
+                            .gen::<faker_rand::fr_fr::internet::Username>()
+                            .to_string()
+                            .into(),
+                        Some("fr_fr/names/first_name") => rng
+                            .gen::<faker_rand::fr_fr::names::FirstName>()
+                            .to_string()
+                            .into(),
+                        Some("fr_fr/names/full_name") => rng
+                            .gen::<faker_rand::fr_fr::names::FullName>()
+                            .to_string()
+                            .into(),
+                        Some("fr_fr/names/last_name") => rng
+                            .gen::<faker_rand::fr_fr::names::LastName>()
+                            .to_string()
+                            .into(),
+                        Some("fr_fr/names/name_prefix") => rng
+                            .gen::<faker_rand::fr_fr::names::NamePrefix>()
+                            .to_string()
+                            .into(),
+                        Some("fr_fr/phones/phone_number") => rng
+                            .gen::<faker_rand::fr_fr::phones::PhoneNumber>()
+                            .to_string()
+                            .into(),
+                        Some("lorem/word") => {
+                            rng.gen::<faker_rand::lorem::Word>().to_string().into()
+                        }
+                        Some("lorem/sentence") => {
+                            rng.gen::<faker_rand::lorem::Sentence>().to_string().into()
+                        }
+                        Some("lorem/paragraph") => {
+                            rng.gen::<faker_rand::lorem::Paragraph>().to_string().into()
+                        }
+                        Some("lorem/paragraphs") => rng
+                            .gen::<faker_rand::lorem::Paragraphs>()
+                            .to_string()
+                            .into(),
+
+                        _ => fuzz_string(rng).into(),
+                    }
+                }
+                Type::Timestamp => {
                     use chrono::TimeZone;
 
                     // We'll generate timestamps with some random seconds offset
@@ -186,7 +424,7 @@ fn fuzz_with_root<R: rand::Rng>(root: &jtd::Schema, rng: &mut R, schema: &jtd::S
                     // ecosystems, we will limit ourselves to the most selective
                     // of these time ranges.
                     let max_offset = 14 * 60 * 60;
-                    chrono::FixedOffset::east(rng.gen_range(-max_offset, max_offset))
+                    chrono::FixedOffset::east(rng.gen_range(-max_offset..=max_offset))
                         .timestamp(rng.gen::<i32>() as i64, 0)
                         .to_rfc3339()
                         .into()
@@ -194,53 +432,55 @@ fn fuzz_with_root<R: rand::Rng>(root: &jtd::Schema, rng: &mut R, schema: &jtd::S
             }
         }
 
-        jtd::Form::Enum(jtd::form::Enum {
-            ref values,
+        Schema::Enum {
+            ref enum_,
             nullable,
-        }) => {
-            if nullable && rng.gen() {
+            ..
+        } => {
+            if *nullable && rng.gen() {
                 return Value::Null;
             }
 
-            values.iter().choose(rng).unwrap().clone().into()
+            enum_.iter().choose(rng).unwrap().clone().into()
         }
 
-        jtd::Form::Elements(jtd::form::Elements {
-            schema: ref sub_schema,
+        Schema::Elements {
+            ref elements,
             nullable,
-        }) => {
-            if nullable && rng.gen() {
+            ..
+        } => {
+            if *nullable && rng.gen() {
                 return Value::Null;
             }
 
-            (0..rng.gen_range(0, MAX_SEQ_LENGTH))
-                .map(|_| fuzz_with_root(root, rng, sub_schema))
+            (0..rng.gen_range(0..MAX_SEQ_LENGTH))
+                .map(|_| fuzz_with_root(root, rng, elements))
                 .collect::<Vec<_>>()
                 .into()
         }
 
-        jtd::Form::Properties(jtd::form::Properties {
-            ref required,
-            ref optional,
-            additional,
+        Schema::Properties {
+            ref properties,
+            ref optional_properties,
+            additional_properties,
             nullable,
             ..
-        }) => {
-            if nullable && rng.gen() {
+        } => {
+            if *nullable && rng.gen() {
                 return Value::Null;
             }
 
             let mut members = BTreeMap::new();
 
-            let mut required_keys: Vec<_> = required.keys().cloned().collect();
+            let mut required_keys: Vec<_> = properties.keys().cloned().collect();
             required_keys.sort();
 
             for k in required_keys {
-                let v = fuzz_with_root(root, rng, &required[&k]);
+                let v = fuzz_with_root(root, rng, &properties[&k]);
                 members.insert(k, v);
             }
 
-            let mut optional_keys: Vec<_> = optional.keys().cloned().collect();
+            let mut optional_keys: Vec<_> = optional_properties.keys().cloned().collect();
             optional_keys.sort();
 
             for k in optional_keys {
@@ -248,11 +488,11 @@ fn fuzz_with_root<R: rand::Rng>(root: &jtd::Schema, rng: &mut R, schema: &jtd::S
                     continue;
                 }
 
-                let v = fuzz_with_root(root, rng, &optional[&k]);
+                let v = fuzz_with_root(root, rng, &optional_properties[&k]);
                 members.insert(k, v);
             }
 
-            if additional {
+            if *additional_properties {
                 // Go's encoding/json package, which implements JSON
                 // serialization/deserialization, is case-insensitive on inputs.
                 //
@@ -263,17 +503,26 @@ fn fuzz_with_root<R: rand::Rng>(root: &jtd::Schema, rng: &mut R, schema: &jtd::S
                 //
                 // Since we'll only generate ASCII properties here, we don't
                 // need to worry about implementing proper Unicode folding.
-                let defined_properties_lowercase: BTreeSet<_> = required
+                let defined_properties_lowercase: BTreeSet<_> = properties
                     .keys()
-                    .chain(optional.keys())
+                    .chain(optional_properties.keys())
                     .map(|s| s.to_lowercase())
                     .collect();
 
-                for _ in 0..rng.gen_range(0, MAX_SEQ_LENGTH) {
+                for _ in 0..rng.gen_range(0..MAX_SEQ_LENGTH) {
                     let key = fuzz_string(rng);
 
                     if !defined_properties_lowercase.contains(&key.to_lowercase()) {
-                        members.insert(key, fuzz_with_root(root, rng, &Default::default()));
+                        members.insert(
+                            key,
+                            fuzz(
+                                &Schema::Empty {
+                                    metadata: Default::default(),
+                                    definitions: Default::default(),
+                                },
+                                rng,
+                            ),
+                        );
                     }
                 }
             }
@@ -284,26 +533,28 @@ fn fuzz_with_root<R: rand::Rng>(root: &jtd::Schema, rng: &mut R, schema: &jtd::S
                 .into()
         }
 
-        jtd::Form::Values(jtd::form::Values {
-            schema: ref sub_schema,
+        Schema::Values {
+            ref values,
             nullable,
-        }) => {
-            if nullable && rng.gen() {
+            ..
+        } => {
+            if *nullable && rng.gen() {
                 return Value::Null;
             }
 
-            (0..rng.gen_range(0, MAX_SEQ_LENGTH))
-                .map(|_| (fuzz_string(rng), fuzz_with_root(root, rng, sub_schema)))
+            (0..rng.gen_range(0..MAX_SEQ_LENGTH))
+                .map(|_| (fuzz_string(rng), fuzz_with_root(root, rng, values)))
                 .collect::<serde_json::Map<String, Value>>()
                 .into()
         }
 
-        jtd::Form::Discriminator(jtd::form::Discriminator {
+        Schema::Discriminator {
             ref mapping,
             ref discriminator,
             nullable,
-        }) => {
-            if nullable && rng.gen() {
+            ..
+        } => {
+            if *nullable && rng.gen() {
                 return Value::Null;
             }
 
@@ -320,14 +571,15 @@ fn fuzz_with_root<R: rand::Rng>(root: &jtd::Schema, rng: &mut R, schema: &jtd::S
 }
 
 fn fuzz_string<R: rand::Rng>(rng: &mut R) -> String {
-    (0..rng.gen_range(0, MAX_SEQ_LENGTH))
-        .map(|_| rng.gen_range(32u8, 127u8) as char)
+    (0..rng.gen_range(0..MAX_SEQ_LENGTH))
+        .map(|_| rng.gen_range(32u8..=127u8) as char)
         .collect::<String>()
 }
 
 #[cfg(test)]
 mod tests {
-    use serde_json::{json, Value};
+    use super::*;
+    use serde_json::json;
 
     #[test]
     fn test_fuzz_empty() {
@@ -430,21 +682,14 @@ mod tests {
 
     fn assert_valid_fuzz(schema: Value) {
         use rand::SeedableRng;
-        use std::convert::TryInto;
 
-        let schema: jtd::SerdeSchema = serde_json::from_value(schema).unwrap();
-        let schema: jtd::Schema = schema.try_into().unwrap();
         let mut rng = rand_pcg::Pcg32::seed_from_u64(8927);
-
-        let validator = jtd::Validator {
-            max_errors: None,
-            max_depth: None,
-        };
+        let schema = Schema::from_serde_schema(serde_json::from_value(schema).unwrap()).unwrap();
 
         // Poor man's fuzzing.
         for _ in 0..1000 {
             let instance = super::fuzz(&schema, &mut rng);
-            let errors = validator.validate(&schema, &instance).unwrap();
+            let errors = jtd::validate(&schema, &instance, Default::default()).unwrap();
             assert!(errors.is_empty(), "{}", instance);
         }
     }
